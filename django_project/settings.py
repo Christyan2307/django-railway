@@ -83,11 +83,11 @@ WSGI_APPLICATION = 'django_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('MYSQLDATABASE', 'chatbot1'),
-        'USER': os.environ.get('MYSQLUSER', 'root'),
-        'PASSWORD': os.environ.get('MYSQLPASSWORD', 'root'),
-        'HOST': os.environ.get('MYSQLHOST', 'localhost'),
-        'PORT': os.environ.get('MYSQLPORT', '3306'),
+        'NAME': os.environ.get('MYSQL_DATABASE', 'chatbot1'),
+        'USER': os.environ.get('MYSQL_USER', 'root'),
+        'PASSWORD': os.environ.get('MYSQL_PASSWORD', 'MiOXroTWfjlzEswHdSnpjpgNkXahDnua'),
+        'HOST': os.environ.get('MYSQL_HOST', 'metro.proxy.rlwy.net'),
+        'PORT': os.environ.get('MYSQL_PORT', '52240'),
     }
 }
 
