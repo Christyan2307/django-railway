@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Agendamento Público</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+
+<h2>Agendamento Público</h2>
+
+<form method="post" class="mb-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Salvar</button>
+</form>
+
+<h3>Agendamentos</h3>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Status</th>
+            <th>Criado em</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ag in agendamentos %}
+        <tr>
+            <td>{{ ag.nome }}</td>
+            <td>{{ ag.telefone }}</td>
+            <td>{{ ag.get_status_display }}</td>
+            <td>{{ ag.criado_em }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">Nenhum agendamento registrado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>
