@@ -1,0 +1,23 @@
+{
+  "name": "chatbot",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp integrado ao Django",
+  "main": "chatbot.js",
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot",
+    "mysql"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "moment-timezone": "^0.5.45",
+    "mysql2": "^3.6.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "scripts": {
+    "start": "node chatbot.js"
+  }
+}
