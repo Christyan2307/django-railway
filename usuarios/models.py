@@ -11,6 +11,7 @@ class AgendamentoPublico(models.Model):
     telefone = models.CharField(max_length=15)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='andamento')
     criado_em = models.DateTimeField(auto_now_add=True)
+    notificado = models.BooleanField(default=False)  # 👈 novo campo
 
     def __str__(self):
         return f"{self.nome} - {self.telefone}"
