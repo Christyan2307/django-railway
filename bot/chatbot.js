@@ -3,11 +3,11 @@ const mysql = require("mysql2/promise");
 
 // === DB (mesmo usado no Django) ===
 const db = mysql.createPool({
-  host: process.env.MYSQLHOST || "metro.proxy.rlwy.net",
-  port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 52240,
-  user: process.env.MYSQLUSER || "root",
-  password: process.env.MYSQLPASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
-  database: process.env.MYSQLDATABASE || "chatbot1"
+  host: process.env.MYSQL_HOST || "metro.proxy.rlwy.net",
+  port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT) : 52240,
+  user: process.env.MYSQL_USER || "root",
+  password: process.env.MYSQL_PASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
+  database: process.env.MYSQL_DATABASE || "chatbot1"
 });
 
 // util
