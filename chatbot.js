@@ -1,16 +1,17 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 const mysql = require("mysql2/promise");
 
-// === DB (mesmo usado no Django) ===
+// === Conexão com o banco (Railway ou local) ===
 const db = mysql.createPool({
-  host: process.env.MYSQL_HOST || "metro.proxy.rlwy.net",
-  port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT) : 52240,
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
-  database: process.env.MYSQL_DATABASE || "chatbot1"
+  host: process.env.MYSQLHOST || process.env.MYSQL_HOST || "metro.proxy.rlwy.net",
+  port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 52240,
+  user: process.env.MYSQLUSER || process.env.MYSQL_USER || "root",
+  password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
+  database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || "chatbot1",
+  waitForConnections: true,
 });
 
-// util
+// Delay simples
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 let checkTimer = null;
@@ -21,6 +22,7 @@ async function startBot() {
 
   const sock = makeWASocket({
     auth: state,
+    printQRInTerminal: false, // Railway não tem terminal interativo
     syncFullHistory: false,
     markOnlineOnConnect: true,
   });
@@ -31,17 +33,17 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-      console.log("📲 Escaneie o QR Code neste link:");
-      console.log(qrImageUrl);
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+      console.log("📱 Escaneie o QR Code para conectar o bot:");
+      console.log(qrUrl);
     }
 
     if (connection === "open") {
-      console.log("✅ Bot conectado no WhatsApp!");
+      console.log("✅ Bot conectado com sucesso ao WhatsApp!");
       isReady = true;
 
       if (checkTimer) clearInterval(checkTimer);
-      checkTimer = setInterval(() => enviarMensagensAutomaticas(sock), 10000); // 10s
+      checkTimer = setInterval(() => enviarMensagensAutomaticas(sock), 20000); // a cada 20s
     }
 
     if (connection === "close") {
@@ -52,19 +54,19 @@ async function startBot() {
       }
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log("Conexão fechada. Reconectar?", shouldReconnect, "| code:", statusCode);
+      console.log("⚠️ Conexão perdida. Reconectar?", shouldReconnect, "| Código:", statusCode);
 
       if (shouldReconnect) startBot();
     }
   });
 
-  // === Buscar agendamentos que ainda NÃO foram notificados ===
+  // === Buscar agendamentos pendentes ===
   async function getAgendamentosPendentes() {
     const [rows] = await db.query(
       `SELECT id, nome, telefone, status 
        FROM app_agendamentopublico 
        WHERE status IN ('andamento','aprovado','cancelado')
-         AND notificado = 0`
+         AND (notificado = 0 OR notificado IS NULL)`
     );
     return rows;
   }
@@ -108,7 +110,6 @@ async function startBot() {
 
           // Marca como notificado no banco
           await db.query("UPDATE app_agendamentopublico SET notificado = 1 WHERE id = ?", [ag.id]);
-
           await delay(1500);
         } catch (err) {
           console.error(`❌ Erro ao enviar para ${ag.nome} (${jid}):`, err?.message || err);
@@ -120,4 +121,7 @@ async function startBot() {
   }
 }
 
-startBot();
+// Iniciar bot
+startBot()
+  .then(() => console.log("🤖 Iniciando bot do WhatsApp..."))
+  .catch((err) => console.error("❌ Erro ao iniciar o bot:", err));
