@@ -1,8 +1,0 @@
-[build]
-builder = "NIXPACKS"
-
-[phases.setup]
-nixPkgs = ["python311", "nodejs_20"]
-
-[start]
-cmd = "python manage.py runserver 0.0.0.0:$PORT"
