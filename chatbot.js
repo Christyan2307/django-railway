@@ -1,127 +1,88 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const express = require("express");
+const bodyParser = require("body-parser");
 const mysql = require("mysql2/promise");
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 
-// === Conexão com o banco (Railway ou local) ===
+const app = express();
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static("public"));
+app.set("view engine", "ejs");
+
+let botSocket = null;
+
 const db = mysql.createPool({
-  host: process.env.MYSQLHOST || process.env.MYSQL_HOST || "metro.proxy.rlwy.net",
+  host: process.env.MYSQLHOST || "metro.proxy.rlwy.net",
   port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 52240,
-  user: process.env.MYSQLUSER || process.env.MYSQL_USER || "root",
-  password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
-  database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || "chatbot1",
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
+  database: process.env.MYSQLDATABASE || "chatbot1",
   waitForConnections: true,
 });
 
-// Delay simples
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-
-let checkTimer = null;
-let isReady = false;
-
+// Inicia o bot
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("baileys_auth");
-
-  const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: false, // Railway não tem terminal interativo
-    syncFullHistory: false,
-    markOnlineOnConnect: true,
-  });
+  const sock = makeWASocket({ auth: state, printQRInTerminal: false });
+  botSocket = sock;
 
   sock.ev.on("creds.update", saveCreds);
-
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-      console.log("📱 Escaneie o QR Code para conectar o bot:");
-      console.log(qrUrl);
-    }
-
-    if (connection === "open") {
-      console.log("✅ Bot conectado com sucesso ao WhatsApp!");
-      isReady = true;
-
-      if (checkTimer) clearInterval(checkTimer);
-      checkTimer = setInterval(() => enviarMensagensAutomaticas(sock), 20000); // a cada 20s
-    }
-
+    if (qr) console.log("📱 Escaneie o QR Code:", `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+    if (connection === "open") console.log("✅ Bot conectado!");
     if (connection === "close") {
-      isReady = false;
-      if (checkTimer) {
-        clearInterval(checkTimer);
-        checkTimer = null;
-      }
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log("⚠️ Conexão perdida. Reconectar?", shouldReconnect, "| Código:", statusCode);
-
-      if (shouldReconnect) startBot();
+      const code = lastDisconnect?.error?.output?.statusCode;
+      if (code !== DisconnectReason.loggedOut) startBot();
     }
   });
-
-  // === Buscar agendamentos pendentes ===
-  async function getAgendamentosPendentes() {
-    const [rows] = await db.query(
-      `SELECT id, nome, telefone, status 
-       FROM app_agendamentopublico 
-       WHERE status IN ('andamento','aprovado','cancelado')
-         AND (notificado = 0 OR notificado IS NULL)`
-    );
-    return rows;
-  }
-
-  // === Enviar mensagens automáticas ===
-  async function enviarMensagensAutomaticas(sockRef) {
-    try {
-      if (!isReady || !sockRef) return;
-
-      const agendamentos = await getAgendamentosPendentes();
-      if (!Array.isArray(agendamentos) || agendamentos.length === 0) return;
-
-      console.log(`🔎 Agendamentos encontrados: ${agendamentos.length}`);
-
-      for (const ag of agendamentos) {
-        let mensagem = "";
-        switch (ag.status) {
-          case "andamento":
-            mensagem = `Olá ${ag.nome}, seu agendamento está em andamento. ⏳`;
-            break;
-          case "aprovado":
-            mensagem = `Olá ${ag.nome}, parabéns! Seu agendamento foi aprovado. 🎉`;
-            break;
-          case "cancelado":
-            mensagem = `Olá ${ag.nome}, infelizmente seu agendamento foi cancelado. ❌`;
-            break;
-          default:
-            continue;
-        }
-
-        let numero = String(ag.telefone || "").replace(/\D/g, "");
-        if (!numero) continue;
-        if (!numero.startsWith("55")) {
-          numero = "55" + numero;
-        }
-        const jid = `${numero}@s.whatsapp.net`;
-
-        try {
-          await sockRef.sendMessage(jid, { text: mensagem });
-          console.log(`📩 Enviado para ${ag.nome} (${jid})`);
-
-          // Marca como notificado no banco
-          await db.query("UPDATE app_agendamentopublico SET notificado = 1 WHERE id = ?", [ag.id]);
-          await delay(1500);
-        } catch (err) {
-          console.error(`❌ Erro ao enviar para ${ag.nome} (${jid}):`, err?.message || err);
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao enviar mensagens automáticas:", error);
-    }
-  }
 }
 
-// Iniciar bot
-startBot()
-  .then(() => console.log("🤖 Iniciando bot do WhatsApp..."))
-  .catch((err) => console.error("❌ Erro ao iniciar o bot:", err));
+// Página principal
+app.get("/", async (req, res) => {
+  const [agendamentos] = await db.query("SELECT * FROM app_agendamentopublico ORDER BY criado_em DESC");
+  res.render("index", { agendamentos });
+});
+
+// Adicionar agendamento e enviar mensagem automaticamente
+app.post("/add", async (req, res) => {
+  try {
+    const { nome, telefone, status } = req.body;
+
+    // Inserir no banco
+    const [result] = await db.query(
+      "INSERT INTO app_agendamentopublico (nome, telefone, status, notificado) VALUES (?, ?, ?, 0)",
+      [nome, telefone, status]
+    );
+    const id = result.insertId;
+
+    // Preparar mensagem
+    let mensagem = "";
+    switch (status) {
+      case "andamento": mensagem = `Olá ${nome}, seu agendamento está em andamento. ⏳`; break;
+      case "aprovado": mensagem = `Olá ${nome}, parabéns! Seu agendamento foi aprovado. 🎉`; break;
+      case "cancelado": mensagem = `Olá ${nome}, infelizmente seu agendamento foi cancelado. ❌`; break;
+      default: mensagem = `Olá ${nome}, status: ${status}`;
+    }
+
+    // Enviar mensagem via WhatsApp
+    if (botSocket) {
+      let numero = String(telefone).replace(/\D/g, "");
+      if (!numero.startsWith("55")) numero = "55" + numero;
+      const jid = `${numero}@s.whatsapp.net`;
+
+      await botSocket.sendMessage(jid, { text: mensagem });
+      // Atualiza banco para notificado
+      await db.query("UPDATE app_agendamentopublico SET notificado=1 WHERE id=?", [id]);
+      console.log(`📩 Mensagem enviada para ${nome} (${jid})`);
+    }
+
+    res.redirect("/");
+  } catch (err) {
+    console.error(err);
+    res.send("Erro ao cadastrar agendamento: " + err.message);
+  }
+});
+
+// Inicia o servidor
+app.listen(3000, () => console.log("🌐 Servidor rodando em http://localhost:3000"));
+startBot();
