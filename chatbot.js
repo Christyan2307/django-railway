@@ -10,16 +10,18 @@ app.set("view engine", "ejs");
 
 let botSocket = null;
 
+// Conexão MySQL (Railway usa variáveis de ambiente)
 const db = mysql.createPool({
-  host: process.env.MYSQLHOST || "metro.proxy.rlwy.net",
-  port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 52240,
-  user: process.env.MYSQLUSER || "root",
-  password: process.env.MYSQLPASSWORD || "MiOXroTWfjlzEswHdSnpjpgNkXahDnua",
-  database: process.env.MYSQLDATABASE || "chatbot1",
+  host: process.env.MYSQLHOST || process.env.MYSQL_HOST,
+  port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
+  user: process.env.MYSQLUSER || process.env.MYSQL_USER,
+  password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE,
   waitForConnections: true,
+  connectTimeout: 10000, // 10s
 });
 
-// Inicia o bot
+// Inicia bot WhatsApp
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("baileys_auth");
   const sock = makeWASocket({ auth: state, printQRInTerminal: false });
@@ -39,8 +41,13 @@ async function startBot() {
 
 // Página principal
 app.get("/", async (req, res) => {
-  const [agendamentos] = await db.query("SELECT * FROM app_agendamentopublico ORDER BY criado_em DESC");
-  res.render("index", { agendamentos });
+  try {
+    const [agendamentos] = await db.query("SELECT * FROM app_agendamentopublico ORDER BY criado_em DESC");
+    res.render("index", { agendamentos });
+  } catch (err) {
+    console.error("Erro ao buscar agendamentos:", err.message);
+    res.send("Erro ao conectar com o banco: " + err.message);
+  }
 });
 
 // Adicionar agendamento e enviar mensagem automaticamente
@@ -64,25 +71,25 @@ app.post("/add", async (req, res) => {
       default: mensagem = `Olá ${nome}, status: ${status}`;
     }
 
-    // Enviar mensagem via WhatsApp
+    // Enviar WhatsApp
     if (botSocket) {
       let numero = String(telefone).replace(/\D/g, "");
       if (!numero.startsWith("55")) numero = "55" + numero;
       const jid = `${numero}@s.whatsapp.net`;
 
       await botSocket.sendMessage(jid, { text: mensagem });
-      // Atualiza banco para notificado
       await db.query("UPDATE app_agendamentopublico SET notificado=1 WHERE id=?", [id]);
       console.log(`📩 Mensagem enviada para ${nome} (${jid})`);
     }
 
     res.redirect("/");
   } catch (err) {
-    console.error(err);
+    console.error("Erro ao cadastrar agendamento:", err.message);
     res.send("Erro ao cadastrar agendamento: " + err.message);
   }
 });
 
-// Inicia o servidor
-app.listen(3000, () => console.log("🌐 Servidor rodando em http://localhost:3000"));
+// Inicia servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🌐 Servidor rodando em http://localhost:${PORT}`));
 startBot();

@@ -61,9 +61,7 @@
 <tr>
 <td><%= ag.nome %></td>
 <td><%= ag.telefone %></td>
-<td>
-  <span class="badge bg-info text-dark"><%= ag.status %></span>
-</td>
+<td><span class="badge bg-info text-dark"><%= ag.status %></span></td>
 <td><%= new Date(ag.criado_em).toLocaleString() %></td>
 <td>
   <% if(ag.notificado) { %>
