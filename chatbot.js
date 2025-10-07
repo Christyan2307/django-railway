@@ -10,18 +10,18 @@ app.set("view engine", "ejs");
 
 let botSocket = null;
 
-// Conexão MySQL (Railway usa variáveis de ambiente)
+// Conexão com o MySQL (variáveis de ambiente do Railway)
 const db = mysql.createPool({
-  host: process.env.MYSQLHOST || process.env.MYSQL_HOST,
+  host: process.env.MYSQLHOST,
   port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
-  user: process.env.MYSQLUSER || process.env.MYSQL_USER,
-  password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
   waitForConnections: true,
-  connectTimeout: 10000, // 10s
+  connectTimeout: 10000
 });
 
-// Inicia bot WhatsApp
+// Inicia o bot WhatsApp
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("baileys_auth");
   const sock = makeWASocket({ auth: state, printQRInTerminal: false });
@@ -30,7 +30,7 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
-    if (qr) console.log("📱 Escaneie o QR Code:", `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+    if (qr) console.log("📱 QR Code:", `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
     if (connection === "open") console.log("✅ Bot conectado!");
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
@@ -45,7 +45,7 @@ app.get("/", async (req, res) => {
     const [agendamentos] = await db.query("SELECT * FROM app_agendamentopublico ORDER BY criado_em DESC");
     res.render("index", { agendamentos });
   } catch (err) {
-    console.error("Erro ao buscar agendamentos:", err.message);
+    console.error(err);
     res.send("Erro ao conectar com o banco: " + err.message);
   }
 });
@@ -84,7 +84,7 @@ app.post("/add", async (req, res) => {
 
     res.redirect("/");
   } catch (err) {
-    console.error("Erro ao cadastrar agendamento:", err.message);
+    console.error(err);
     res.send("Erro ao cadastrar agendamento: " + err.message);
   }
 });
